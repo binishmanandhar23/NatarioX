@@ -86,7 +86,7 @@ internal class VideoRenderer(
         frameDropper = FrameDropper(
                 sourceFormat.getInteger(KEY_FRAME_RATE),
                 targetFormat.getInteger(KEY_FRAME_RATE))
-        return frameDrawer.surface
+        return frameDrawer.surface!!
     }
 
     override fun handleRawFormat(rawFormat: MediaFormat) = Unit
@@ -98,7 +98,7 @@ internal class VideoRenderer(
         } else {
             if (frameDropper.shouldRender(state.value.timeUs)) {
                 state.value.release(true)
-                frameDrawer.drawFrame()
+                frameDrawer.drawFrame(timestampUs = state.value.timeUs)
                 State.Ok(state.value.timeUs)
             } else {
                 state.value.release(false)
