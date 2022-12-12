@@ -1,5 +1,6 @@
 package com.otaliastudios.transcoder.internal.thumbnails
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaFormat
 import android.media.MediaFormat.KEY_HEIGHT
@@ -55,7 +56,7 @@ internal class DefaultThumbnailsEngine(
             audio = RemoveTrackStrategy()
     ), dataSources, rotation, true)
 
-    private val segments = Segments(dataSources, tracks, ::createPipeline)
+    private val segments = Segments(sources = dataSources, tracks = tracks, factory = ::createPipeline)
 
     private val timer = Timer(DefaultTimeInterpolator(), dataSources, tracks, segments.currentIndex)
 
@@ -76,6 +77,7 @@ internal class DefaultThumbnailsEngine(
     }
 
     private fun createPipeline(
+            context: Context?,
             type: TrackType,
             index: Int,
             status: TrackStatus,
@@ -97,7 +99,7 @@ internal class DefaultThumbnailsEngine(
             Seeker(source, positions) { it == stubs.firstOrNull()?.localizedUs } +
                     Reader(source, type) +
                     Decoder(source.getTrackFormat(type)!!, continuous = false) +
-                    VideoRenderer(source.orientation, rotation, outputFormat, flipY = true) +
+                    VideoRenderer(source.orientation, rotation, outputFormat, flipY = true, context = context) +
                     VideoSnapshots(outputFormat, positions, 50 * 1000) { pos, bitmap ->
                         val stub = stubs.removeFirst()
                         stub.actualLocalizedUs = pos

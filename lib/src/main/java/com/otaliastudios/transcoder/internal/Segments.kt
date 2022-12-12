@@ -1,5 +1,6 @@
 package com.otaliastudios.transcoder.internal
 
+import android.content.Context
 import android.media.MediaFormat
 import com.otaliastudios.transcoder.common.TrackStatus
 import com.otaliastudios.transcoder.common.TrackType
@@ -9,9 +10,10 @@ import com.otaliastudios.transcoder.internal.utils.TrackMap
 import com.otaliastudios.transcoder.internal.utils.mutableTrackMapOf
 
 internal class Segments(
+        private val context: Context? = null,
         private val sources: DataSources,
         private val tracks: Tracks,
-        private val factory: (TrackType, Int, TrackStatus, MediaFormat) -> Pipeline
+        private val factory: (Context?, TrackType, Int, TrackStatus, MediaFormat) -> Pipeline
 ) {
 
     private val log = Logger("Segments")
@@ -85,6 +87,7 @@ internal class Segments(
         // who check it during pipeline init.
         currentIndex[type] = index
         val pipeline = factory(
+                context,
                 type,
                 index,
                 tracks.all[type],

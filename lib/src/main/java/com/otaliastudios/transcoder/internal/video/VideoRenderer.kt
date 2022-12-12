@@ -1,8 +1,11 @@
 package com.otaliastudios.transcoder.internal.video
 
+import android.content.Context
+import android.graphics.BitmapFactory
 import android.media.MediaFormat
 import android.media.MediaFormat.*
 import android.view.Surface
+import com.otaliastudios.transcoder.R
 import com.otaliastudios.transcoder.internal.codec.DecoderChannel
 import com.otaliastudios.transcoder.internal.codec.DecoderData
 import com.otaliastudios.transcoder.internal.media.MediaFormatConstants.KEY_ROTATION_DEGREES
@@ -10,13 +13,16 @@ import com.otaliastudios.transcoder.internal.pipeline.Channel
 import com.otaliastudios.transcoder.internal.pipeline.State
 import com.otaliastudios.transcoder.internal.pipeline.Step
 import com.otaliastudios.transcoder.internal.utils.Logger
+import com.otaliastudios.transcoder.test.BitmapOverlayFilter
+import com.otaliastudios.transcoder.test.natario.GrayscaleFilter
 
 
 internal class VideoRenderer(
         private val sourceRotation: Int, // intrinsic source rotation
         private val extraRotation: Int, // any extra rotation in TranscoderOptions
         private val targetFormat: MediaFormat,
-        flipY: Boolean = false
+        flipY: Boolean = false,
+        private val context: Context? = null
 ): Step<DecoderData, DecoderChannel, Long, Channel>, DecoderChannel {
 
     private val log = Logger("VideoRenderer")
@@ -25,7 +31,12 @@ internal class VideoRenderer(
 
     // frame drawer needs EGL context which is not created by us, so let's use by lazy.
     private val frameDrawer by lazy {
-        val drawer = FrameDrawer()
+        var bitmapFilter: BitmapOverlayFilter? = null
+        if(context != null) {
+            val bitmap = BitmapFactory.decodeResource(context.resources, R.raw.christmas)
+            bitmapFilter = BitmapOverlayFilter(context, bitmap)
+        }
+        val drawer = FrameDrawer(filter = bitmapFilter?: GrayscaleFilter())
         drawer.setFlipY(flipY)
         drawer
     }

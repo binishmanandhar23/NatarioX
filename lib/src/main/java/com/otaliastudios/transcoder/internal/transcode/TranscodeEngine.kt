@@ -1,5 +1,6 @@
 package com.otaliastudios.transcoder.internal.transcode
 
+import android.content.Context
 import com.otaliastudios.transcoder.Transcoder
 import com.otaliastudios.transcoder.TranscoderOptions
 import com.otaliastudios.transcoder.internal.DataSources
@@ -24,12 +25,13 @@ internal abstract class TranscodeEngine {
         }
 
         @JvmStatic
-        fun transcode(options: TranscoderOptions) {
+        fun transcode(context: Context, options: TranscoderOptions) {
             log.i("transcode(): called...")
             var engine: TranscodeEngine? = null
             val dispatcher = TranscodeDispatcher(options)
             try {
                 engine = DefaultTranscodeEngine(
+                        context = context,
                         dataSources = DataSources(options),
                         dataSink = options.dataSink,
                         strategies = trackMapOf(

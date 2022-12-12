@@ -8,6 +8,7 @@ import androidx.annotation.VisibleForTesting;
 import com.otaliastudios.opengl.draw.GlDrawable;
 import com.otaliastudios.opengl.draw.GlRect;
 import com.otaliastudios.opengl.program.GlTextureProgram;
+import com.otaliastudios.opengl.texture.GlTexture;
 
 /**
  * A base implementation of {@link Filter} that just leaves the fragment shader to subclasses.

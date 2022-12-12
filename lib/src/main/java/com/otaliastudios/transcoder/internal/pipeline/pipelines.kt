@@ -1,5 +1,6 @@
 package com.otaliastudios.transcoder.internal.pipeline
 
+import android.content.Context
 import android.media.MediaFormat
 import com.otaliastudios.transcoder.common.TrackType
 import com.otaliastudios.transcoder.internal.Codecs
@@ -34,6 +35,7 @@ internal fun PassThroughPipeline(
 }
 
 internal fun RegularPipeline(
+        context: Context?,
         track: TrackType,
         source: DataSource,
         sink: DataSink,
@@ -44,11 +46,12 @@ internal fun RegularPipeline(
         audioStretcher: AudioStretcher,
         audioResampler: AudioResampler
 ) = when (track) {
-    TrackType.VIDEO -> VideoPipeline(source, sink, interpolator, format, codecs, videoRotation)
+    TrackType.VIDEO -> VideoPipeline(context, source, sink, interpolator, format, codecs, videoRotation)
     TrackType.AUDIO -> AudioPipeline(source, sink, interpolator, format, codecs, audioStretcher, audioResampler)
 }
 
 private fun VideoPipeline(
+        context: Context?,
         source: DataSource,
         sink: DataSink,
         interpolator: TimeInterpolator,
@@ -59,7 +62,7 @@ private fun VideoPipeline(
     Reader(source, TrackType.VIDEO) +
             Decoder(source.getTrackFormat(TrackType.VIDEO)!!, true) +
             DecoderTimer(TrackType.VIDEO, interpolator) +
-            VideoRenderer(source.orientation, videoRotation, format) +
+            VideoRenderer(source.orientation, videoRotation, format, context = context) +
             VideoPublisher() +
             Encoder(codecs, TrackType.VIDEO) +
             Writer(sink, TrackType.VIDEO)

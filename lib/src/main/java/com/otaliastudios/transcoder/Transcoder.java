@@ -15,6 +15,7 @@
  */
 package com.otaliastudios.transcoder;
 
+import android.content.Context;
 import android.os.Build;
 
 import com.otaliastudios.transcoder.internal.transcode.TranscodeEngine;
@@ -43,14 +44,22 @@ public class Transcoder {
      */
     public static final int SUCCESS_NOT_NEEDED = 1;
 
+    private Context context;
+
     @SuppressWarnings("WeakerAccess")
     @NonNull
-    public static Transcoder getInstance() {
-        return new Transcoder();
+    public static Transcoder getInstance(Context context) {
+        Transcoder transcoder = new Transcoder();
+        transcoder.setContext(context);
+        return transcoder;
     }
 
     private Transcoder() { /* private */ }
 
+
+    protected void setContext(Context context){
+        this.context = context;
+    }
     /**
      * Starts building transcoder options.
      * Requires a non null absolute path to the output file.
@@ -99,7 +108,7 @@ public class Transcoder {
         return ThreadPool.getExecutor().submit(new Callable<Void>() {
             @Override
             public Void call() throws Exception {
-                TranscodeEngine.transcode(options);
+                TranscodeEngine.transcode(context, options);
                 return null;
             }
         });

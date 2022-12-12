@@ -9,6 +9,8 @@ import com.otaliastudios.opengl.draw.GlRect
 import com.otaliastudios.opengl.program.GlTextureProgram
 import com.otaliastudios.opengl.texture.GlTexture
 import com.otaliastudios.transcoder.internal.utils.Logger
+import com.otaliastudios.transcoder.test.BitmapOverlayFilter
+import com.otaliastudios.transcoder.test.natario.Filter
 import com.otaliastudios.transcoder.test.natario.GlTextureDrawer
 import com.otaliastudios.transcoder.test.natario.GrayscaleFilter
 
@@ -25,7 +27,7 @@ import com.otaliastudios.transcoder.test.natario.GrayscaleFilter
  * NOTE: By default, the Surface will be using a BufferQueue in asynchronous mode, so we
  * can potentially drop frames.
  */
-internal class FrameDrawer() {
+internal class FrameDrawer(filter: Filter? = null) {
     private var mSurfaceTexture: SurfaceTexture?
 
     /**
@@ -53,7 +55,8 @@ internal class FrameDrawer() {
     init {
         val texture = GlTexture()
         textureDrawer = GlTextureDrawer(texture)
-        textureDrawer?.setFilter(GrayscaleFilter())
+        if(filter != null)
+            textureDrawer?.setFilter(filter)
         /*mProgram = GlTextureProgram()
         mProgram!!.texture = textureDrawer?.texture*/
         mDrawable = GlRect()

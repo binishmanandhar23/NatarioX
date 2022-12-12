@@ -1,5 +1,6 @@
 package com.otaliastudios.transcoder.internal.transcode
 
+import android.content.Context
 import android.media.MediaFormat
 import com.otaliastudios.transcoder.common.TrackStatus
 import com.otaliastudios.transcoder.common.TrackType
@@ -25,6 +26,7 @@ import com.otaliastudios.transcoder.time.TimeInterpolator
 import com.otaliastudios.transcoder.validator.Validator
 
 internal class DefaultTranscodeEngine(
+        private val context: Context,
         private val dataSources: DataSources,
         private val dataSink: DataSink,
         strategies: TrackMap<TrackStrategy>,
@@ -39,7 +41,7 @@ internal class DefaultTranscodeEngine(
 
     private val tracks = Tracks(strategies, dataSources, videoRotation, false)
 
-    private val segments = Segments(dataSources, tracks, ::createPipeline)
+    private val segments = Segments(context, dataSources, tracks, factory = ::createPipeline)
 
     private val timer = Timer(interpolator, dataSources, tracks, segments.currentIndex)
 
@@ -61,10 +63,11 @@ internal class DefaultTranscodeEngine(
     }
 
     private fun createPipeline(
-            type: TrackType,
-            index: Int,
-            status: TrackStatus,
-            outputFormat: MediaFormat
+        context: Context?,
+        type: TrackType,
+        index: Int,
+        status: TrackStatus,
+        outputFormat: MediaFormat
     ): Pipeline {
         log.w("createPipeline($type, $index, $status), format=$outputFormat")
         val interpolator = timer.interpolator(type, index)
@@ -79,7 +82,7 @@ internal class DefaultTranscodeEngine(
             TrackStatus.ABSENT -> EmptyPipeline()
             TrackStatus.REMOVING -> EmptyPipeline()
             TrackStatus.PASS_THROUGH -> PassThroughPipeline(type, source, sink, interpolator)
-            TrackStatus.COMPRESSING -> RegularPipeline(type,
+            TrackStatus.COMPRESSING -> RegularPipeline(context, type,
                     source, sink, interpolator, outputFormat, codecs,
                     videoRotation, audioStretcher, audioResampler)
         }

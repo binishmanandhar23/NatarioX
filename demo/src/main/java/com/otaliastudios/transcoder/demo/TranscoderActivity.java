@@ -320,7 +320,7 @@ public class TranscoderActivity extends AppCompatActivity implements
                     }
                 })
                 .setSpeed(speed)
-                .transcode();
+                .transcode(this);
     }
 
     @Override
