@@ -34,7 +34,7 @@ internal class VideoRenderer(
         var bitmapFilter: BitmapOverlayFilter? = null
         if(context != null) {
             val bitmap = BitmapFactory.decodeResource(context.resources, R.raw.christmas)
-            bitmapFilter = BitmapOverlayFilter(context, bitmap)
+            //bitmapFilter = BitmapOverlayFilter(context, bitmap)
         }
         val drawer = FrameDrawer(filter = bitmapFilter?: GrayscaleFilter())
         drawer.setFlipY(flipY)

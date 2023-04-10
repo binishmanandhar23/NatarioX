@@ -3,11 +3,13 @@ package com.otaliastudios.transcoder.test
 import android.graphics.Bitmap
 import android.opengl.GLES20
 import android.opengl.GLUtils
+import android.opengl.Matrix
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import com.otaliastudios.opengl.draw.GlDrawable
 import com.otaliastudios.opengl.draw.GlRect
 import com.otaliastudios.opengl.program.GlTextureProgram
+import com.otaliastudios.opengl.texture.GlTexture
 import com.otaliastudios.transcoder.test.LiTr.GlRenderUtils
 import com.otaliastudios.transcoder.test.natario.Filter
 import com.otaliastudios.transcoder.test.natario.OneParameterFilter
@@ -29,6 +31,11 @@ abstract class BaseOverlayFilter : Filter {
     var program: GlTextureProgram? = null
     var programDrawable: GlDrawable? = null
 
+    private var glOverlayProgram = 0
+    private var overlayMvpMatrixHandle = 0
+    private var overlayUstMatrixHandle = 0
+    private val stMatrix = FloatArray(16)
+
     @VisibleForTesting
     var size: Size? = null
 
@@ -49,14 +56,21 @@ abstract class BaseOverlayFilter : Filter {
 
 
     override fun onCreate(programHandle: Int) {
-        program = GlTextureProgram(
-            programHandle,
-            vertexPositionName,
-            vertexModelViewProjectionMatrixName,
-            vertexTextureCoordinateName,
-            vertexTransformMatrixName
-        )
-        programDrawable = GlRect()
+        Matrix.setIdentityM(stMatrix, 0)
+        Matrix.scaleM(stMatrix, 0, 1f, -1f, 1f)
+
+        glOverlayProgram = programHandle
+        // Get the location of our uniforms
+        overlayMvpMatrixHandle = GLES20.glGetUniformLocation(glOverlayProgram, "uMVPMatrix")
+        GlRenderUtils.checkGlError("glGetUniformLocation uMVPMatrix")
+        if (overlayMvpMatrixHandle == -1) {
+            throw RuntimeException("Could not get attrib location for uMVPMatrix")
+        }
+        overlayUstMatrixHandle = GLES20.glGetUniformLocation(glOverlayProgram, "uSTMatrix")
+        GlRenderUtils.checkGlError("glGetUniformLocation uSTMatrix")
+        if (overlayUstMatrixHandle == -1) {
+            throw RuntimeException("Could not get attrib location for uSTMatrix")
+        }
     }
 
     /*fun setGlProgram(program: GlTextureProgram, programDrawable: GlDrawable){
@@ -78,6 +92,11 @@ abstract class BaseOverlayFilter : Filter {
         size = Size(width, height)
     }
 
+    private var textureId = 0
+    fun setTextureId(textureId: Int){
+        this.textureId = textureId
+    }
+
     override fun draw(timestampUs: Long, transformMatrix: FloatArray) {
         if (program == null) {
             Log.w(
@@ -85,6 +104,44 @@ abstract class BaseOverlayFilter : Filter {
                 "Filter.draw() called after destroying the filter. " + "This can happen rarely because of threading."
             )
         } else {
+            // Switch to overlay texture
+            GLES20.glUseProgram(program?.handle?: glOverlayProgram)
+            /*GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)*/
+
+            /*program?.texture = GlTexture(
+                unit = GLES20.GL_TEXTURE0,
+                target = GLES20.GL_TEXTURE_2D,
+                id = textureId
+            )*/
+
+
+            GLES20.glUniformMatrix4fv(
+                overlayMvpMatrixHandle,
+                1,
+                false,
+                programDrawable!!.modelMatrix,
+                0
+            )
+            GLES20.glUniformMatrix4fv(overlayUstMatrixHandle, 1, false, stMatrix, 0)
+
+
+            // Enable blending
+            GLES20.glEnable(GLES20.GL_BLEND)
+            GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+
+
+            // For controlling opacity
+            val opacityParam = GLES20.glGetUniformLocation(program?.handle?: glOverlayProgram, "opacity")
+            GLES20.glUniform1f(opacityParam, 0.8f)
+
+
+            // Call OpenGL to draw
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+            GlRenderUtils.checkGlError("glDrawArrays")
+            GLES20.glDisable(GLES20.GL_BLEND)
+
+
             onPreDraw(timestampUs, transformMatrix)
             onDraw(timestampUs)
             onPostDraw(timestampUs)
