@@ -53,7 +53,7 @@ internal class FrameDrawer(filter: Filter? = null) {
      * new one). Creates a Surface that can be passed to MediaCodec.configure().
      */
     init {
-        val texture = GlTexture()
+        val texture = GlTexture(unit = GlTextureDrawer.TEXTURE_UNIT, target = GlTextureDrawer.TEXTURE_TARGET)
         textureDrawer = GlTextureDrawer(texture)
         if(filter != null)
             textureDrawer?.setFilter(filter)

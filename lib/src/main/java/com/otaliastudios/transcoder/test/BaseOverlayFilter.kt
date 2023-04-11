@@ -1,16 +1,18 @@
 package com.otaliastudios.transcoder.test
 
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.opengl.GLES20
 import android.opengl.GLUtils
 import android.opengl.Matrix
-import android.util.Log
 import androidx.annotation.VisibleForTesting
+import com.otaliastudios.opengl.core.Egloo
 import com.otaliastudios.opengl.draw.GlDrawable
-import com.otaliastudios.opengl.draw.GlRect
 import com.otaliastudios.opengl.program.GlTextureProgram
-import com.otaliastudios.opengl.texture.GlTexture
+import com.otaliastudios.transcoder.test.LiTr.GlFilterUtil
 import com.otaliastudios.transcoder.test.LiTr.GlRenderUtils
+import com.otaliastudios.transcoder.test.LiTr.GlRenderUtils.checkGlError
+import com.otaliastudios.transcoder.test.LiTr.Transform
 import com.otaliastudios.transcoder.test.natario.Filter
 import com.otaliastudios.transcoder.test.natario.OneParameterFilter
 import com.otaliastudios.transcoder.test.natario.Size
@@ -31,10 +33,6 @@ abstract class BaseOverlayFilter : Filter {
     var program: GlTextureProgram? = null
     var programDrawable: GlDrawable? = null
 
-    private var glOverlayProgram = 0
-    private var overlayMvpMatrixHandle = 0
-    private var overlayUstMatrixHandle = 0
-    private val stMatrix = FloatArray(16)
 
     @VisibleForTesting
     var size: Size? = null
@@ -55,97 +53,128 @@ abstract class BaseOverlayFilter : Filter {
     private var fragmentTextureCoordinateName = DEFAULT_FRAGMENT_TEXTURE_COORDINATE_NAME
 
 
+    private var transform: Transform =
+        Transform(size = PointF(1f, 1f), position = PointF(0.5f, 0.5f), rotation = 0f, opacity = 1f)
+
+    private var vertexShaderHandle = 0
+    private var fragmentShaderHandle = 0
+    private var glOverlayProgram = 0
+    private var overlayMvpMatrixHandle = 0
+    private var overlayUstMatrixHandle = 0
+
+    private var mvpMatrix: FloatArray = Egloo.IDENTITY_MATRIX.clone()
+    private var mvpMatrixOffset = 0
+
+    private val stMatrix = FloatArray(16)
+
+
+    private var overlayTextureId = 0
+
+
+    fun setVpMatrix(vpMatrix: FloatArray, vpMatrixOffset: Int) {
+        // last, we multiply the model matrix by the view matrix to get final MVP matrix for an overlay
+        mvpMatrix = GlFilterUtil.createFilterMvpMatrix(vpMatrix, transform)
+        mvpMatrixOffset = vpMatrixOffset
+    }
+
     override fun onCreate(programHandle: Int) {
+        init()
+    }
+
+    private fun init() {
         Matrix.setIdentityM(stMatrix, 0)
         Matrix.scaleM(stMatrix, 0, 1f, -1f, 1f)
 
-        glOverlayProgram = programHandle
+        vertexShaderHandle = GlRenderUtils.loadShader(
+            GLES20.GL_VERTEX_SHADER,
+            VERTEX_SHADER
+        )
+        if (vertexShaderHandle == 0) {
+            throw java.lang.RuntimeException("failed loading vertex shader")
+        }
+        fragmentShaderHandle = GlRenderUtils.loadShader(
+            GLES20.GL_FRAGMENT_SHADER,
+            FRAGMENT_OVERLAY_SHADER
+        )
+        if (fragmentShaderHandle == 0) {
+            onDestroy()
+            throw java.lang.RuntimeException("failed loading fragment shader")
+        }
+
+        // Create program
+
+        // Create program
+        glOverlayProgram = GlRenderUtils.createProgram(vertexShaderHandle, fragmentShaderHandle)
+        if (glOverlayProgram == 0) {
+            onDestroy()
+            throw java.lang.RuntimeException("failed creating glOverlayProgram")
+        }
+
+        // Get the location of our uniforms
+
         // Get the location of our uniforms
         overlayMvpMatrixHandle = GLES20.glGetUniformLocation(glOverlayProgram, "uMVPMatrix")
-        GlRenderUtils.checkGlError("glGetUniformLocation uMVPMatrix")
+        checkGlError("glGetUniformLocation uMVPMatrix")
         if (overlayMvpMatrixHandle == -1) {
-            throw RuntimeException("Could not get attrib location for uMVPMatrix")
+            throw java.lang.RuntimeException("Could not get attrib location for uMVPMatrix")
         }
-        overlayUstMatrixHandle = GLES20.glGetUniformLocation(glOverlayProgram, "uSTMatrix")
-        GlRenderUtils.checkGlError("glGetUniformLocation uSTMatrix")
+        overlayUstMatrixHandle = GLES20.glGetUniformLocation(glOverlayProgram, "uTexMatrix")
+        checkGlError("glGetUniformLocation uSTMatrix")
         if (overlayUstMatrixHandle == -1) {
-            throw RuntimeException("Could not get attrib location for uSTMatrix")
+            throw java.lang.RuntimeException("Could not get attrib location for uTexMatrix")
         }
     }
 
-    /*fun setGlProgram(program: GlTextureProgram, programDrawable: GlDrawable){
-        this.program = program
-        this.programDrawable = programDrawable
-    }*/
+    fun setOverlayTextureId(overlayTextureId: Int, bitmap: Bitmap) {
+        this.overlayTextureId = overlayTextureId
+        this.transform = Transform(
+            size = PointF(0.5f, 0.5f),
+            position = PointF(0.5f, 0.5f),
+            rotation = 0f
+        )
+    }
 
     override fun onDestroy() {
         // Since we used the handle constructor of GlTextureProgram, calling release here
         // will NOT destroy the GL program. This is important because Filters are not supposed
         // to have ownership of programs. Creation and deletion happen outside, and deleting twice
         // would cause an error.
-        program!!.release()
+        program?.release()
         program = null
         programDrawable = null
+
+        GLES20.glDeleteProgram(glOverlayProgram)
+        GLES20.glDeleteShader(vertexShaderHandle)
+        GLES20.glDeleteShader(fragmentShaderHandle)
+        glOverlayProgram = 0
+        vertexShaderHandle = 0
+        fragmentShaderHandle = 0
     }
 
     override fun setSize(width: Int, height: Int) {
         size = Size(width, height)
     }
 
-    private var textureId = 0
-    fun setTextureId(textureId: Int){
-        this.textureId = textureId
-    }
-
     override fun draw(timestampUs: Long, transformMatrix: FloatArray) {
-        if (program == null) {
-            Log.w(
-                tag,
-                "Filter.draw() called after destroying the filter. " + "This can happen rarely because of threading."
-            )
-        } else {
-            // Switch to overlay texture
-            GLES20.glUseProgram(program?.handle?: glOverlayProgram)
-            /*GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)*/
 
-            /*program?.texture = GlTexture(
-                unit = GLES20.GL_TEXTURE0,
-                target = GLES20.GL_TEXTURE_2D,
-                id = textureId
-            )*/
+        // Switch to overlay texture
+        GLES20.glUseProgram(glOverlayProgram)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, overlayTextureId)
 
+        GLES20.glUniformMatrix4fv(overlayMvpMatrixHandle, 1, false, mvpMatrix, mvpMatrixOffset)
+        GLES20.glUniformMatrix4fv(overlayUstMatrixHandle, 1, false, stMatrix, 0)
 
-            GLES20.glUniformMatrix4fv(
-                overlayMvpMatrixHandle,
-                1,
-                false,
-                programDrawable!!.modelMatrix,
-                0
-            )
-            GLES20.glUniformMatrix4fv(overlayUstMatrixHandle, 1, false, stMatrix, 0)
+        // Enable blending
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+//        GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA, GLES20.GL_ONE, GLES20.GL_ZERO)
 
+        // Call OpenGL to draw
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        checkGlError("glDrawArrays")
 
-            // Enable blending
-            GLES20.glEnable(GLES20.GL_BLEND)
-            GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-
-
-            // For controlling opacity
-            val opacityParam = GLES20.glGetUniformLocation(program?.handle?: glOverlayProgram, "opacity")
-            GLES20.glUniform1f(opacityParam, 0.8f)
-
-
-            // Call OpenGL to draw
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
-            GlRenderUtils.checkGlError("glDrawArrays")
-            GLES20.glDisable(GLES20.GL_BLEND)
-
-
-            onPreDraw(timestampUs, transformMatrix)
-            onDraw(timestampUs)
-            onPostDraw(timestampUs)
-        }
+        GLES20.glDisable(GLES20.GL_BLEND)
     }
 
     private fun onPreDraw(timestampUs: Long, transformMatrix: FloatArray) {
@@ -199,12 +228,12 @@ abstract class BaseOverlayFilter : Filter {
 
         // Tell OpenGL to bind this texture
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, overlayTextureID)
-        GlRenderUtils.checkGlError("glBindTexture overlayTextureID")
+        checkGlError("glBindTexture overlayTextureID")
 
         // Set default texture filtering parameters
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
-        GlRenderUtils.checkGlError("glTexParameter")
+        checkGlError("glTexParameter")
 
         // Load the bitmap and copy it over into the texture
         GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, overlayBitmap, 0)
@@ -244,9 +273,26 @@ void main() {
     }
 
     companion object {
-        private const val VERTEX_SHADER =
-            "uniform mat4 uMVPMatrix;\n" + "uniform mat4 uTexMatrix;\n" + "attribute vec4 aPosition;\n" + "attribute vec4 aTextureCoord;\n" + "varying vec2 vTextureCoord;\n" + "void main() {\n" + "  gl_Position = uMVPMatrix * aPosition;\n" + "  vTextureCoord = (uTexMatrix * aTextureCoord).xy;\n" + "}\n"
-        private const val FRAGMENT_OVERLAY_SHADER =
-            "precision mediump float;\n" + "uniform sampler2D uTexture;\n" + "uniform float opacity;\n" + "varying vec2 vTextureCoord;\n" + "void main() {\n" + "  gl_FragColor = texture2D(uTexture, vTextureCoord);\n" + "  gl_FragColor.a *= opacity;\n" + "}\n"
+        const val FLOAT_SIZE_BYTES = 4
+        private const val TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 5 * FLOAT_SIZE_BYTES
+        private const val TRIANGLE_VERTICES_DATA_POS_OFFSET = 0
+        private const val TRIANGLE_VERTICES_DATA_UV_OFFSET = 3
+
+        private const val VERTEX_SHADER = "uniform mat4 uMVPMatrix;\n" +
+                "uniform mat4 uTexMatrix;\n" +
+                "attribute vec4 aPosition;\n" +
+                "attribute vec4 aTextureCoord;\n" +
+                "varying vec2 vTextureCoord;\n" +
+                "void main() {\n" +
+                "  gl_Position = uMVPMatrix * aPosition;\n" +
+                "  vTextureCoord = (uTexMatrix * aTextureCoord).xy;\n" +
+                "}\n"
+
+        private const val FRAGMENT_OVERLAY_SHADER = "precision mediump float;\n" +
+                "uniform sampler2D uTexture;\n" +
+                "varying vec2 vTextureCoord;\n" +
+                "void main() {\n" +
+                "  gl_FragColor = texture2D(uTexture, vTextureCoord);\n" +
+                "}\n"
     }
 }

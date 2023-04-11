@@ -5,15 +5,12 @@ import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.RectF
 import android.net.Uri
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.util.Log
 import com.otaliastudios.opengl.draw.GlRect
 import com.otaliastudios.opengl.program.GlTextureProgram
-import com.otaliastudios.opengl.texture.GlTexture
-import com.otaliastudios.transcoder.test.natario.Size
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.InputStream
@@ -28,9 +25,11 @@ class BitmapOverlayFilter(): BaseOverlayFilter() {
 
     private var context: Context? = null
 
+    private lateinit var bitmap: Bitmap
+
     constructor(context: Context, bitmap: Bitmap) : this() {
         this.context = context
-        overlayTextureID = createOverlayTexture(bitmap)
+        this.bitmap = bitmap
     }
 
     constructor(context: Context, bitmapUri: Uri): this(){
@@ -44,6 +43,7 @@ class BitmapOverlayFilter(): BaseOverlayFilter() {
 
     @SuppressLint("VisibleForTests")
     override fun onCreate(programHandle: Int) {
+        super.onCreate(programHandle)
         program = GlTextureProgram(
             programHandle,
             vertexPositionName,
@@ -52,22 +52,29 @@ class BitmapOverlayFilter(): BaseOverlayFilter() {
             vertexTransformMatrixName
         )
         programDrawable = GlRect()
+
+        overlayTextureID = createOverlayTexture(bitmap)
+        setOverlayTextureId(overlayTextureId = overlayTextureID, bitmap = bitmap)
+
         /*if(overlayTextureID >= 0)
             program?.texture = GlTexture(TEXTURE_UNIT, TEXTURE_TARGET, overlayTextureID)*/
     }
 
 
     private fun decodeBitmap(imageUri: Uri): Bitmap? {
+        val options = BitmapFactory.Options()
+        //options.inScaled = false // No pre-scaling
+
         var bitmap: Bitmap? = null
         if (ContentResolver.SCHEME_FILE == imageUri.scheme && imageUri.path != null) {
             val file = File(imageUri.path)
-            bitmap = BitmapFactory.decodeFile(file.path)
+            bitmap = BitmapFactory.decodeFile(file.path, options)
         } else if (ContentResolver.SCHEME_CONTENT == imageUri.scheme) {
             val inputStream: InputStream?
             try {
                 inputStream = context!!.contentResolver.openInputStream(imageUri)
                 if (inputStream != null) {
-                    bitmap = BitmapFactory.decodeStream(inputStream, null, null)
+                    bitmap = BitmapFactory.decodeStream(inputStream, null, options)
                 }
             } catch (e: FileNotFoundException) {
                 Log.e(tag, "Unable to open overlay image Uri $imageUri", e)

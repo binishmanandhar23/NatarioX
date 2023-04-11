@@ -1,6 +1,8 @@
 package com.otaliastudios.transcoder.internal.video
 
 import android.content.Context
+import android.content.res.AssetManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaFormat
 import android.media.MediaFormat.*
@@ -15,6 +17,8 @@ import com.otaliastudios.transcoder.internal.pipeline.Step
 import com.otaliastudios.transcoder.internal.utils.Logger
 import com.otaliastudios.transcoder.test.BitmapOverlayFilter
 import com.otaliastudios.transcoder.test.natario.GrayscaleFilter
+import java.io.IOException
+import java.io.InputStream
 
 
 internal class VideoRenderer(
@@ -33,8 +37,10 @@ internal class VideoRenderer(
     private val frameDrawer by lazy {
         var bitmapFilter: BitmapOverlayFilter? = null
         if(context != null) {
-            val bitmap = BitmapFactory.decodeResource(context.resources, R.raw.christmas)
-            //bitmapFilter = BitmapOverlayFilter(context, bitmap)
+//            val bitmap = BitmapFactory.decodeResource(context.resources, R.raw.company_logo)
+            getBitmapFromAsset(context.assets, "company_logo.png")?.let { bitmap ->
+                bitmapFilter = BitmapOverlayFilter(context, bitmap)
+            }
         }
         val drawer = FrameDrawer(filter = bitmapFilter?: GrayscaleFilter())
         drawer.setFlipY(flipY)
@@ -120,5 +126,22 @@ internal class VideoRenderer(
 
     override fun release() {
         frameDrawer.release()
+    }
+
+    fun getBitmapFromAsset(mgr: AssetManager, path: String): Bitmap? {
+        var `is`: InputStream? = null
+        var bitmap: Bitmap?
+        try {
+            `is` = mgr.open(path)
+            bitmap = BitmapFactory.decodeStream(`is`)
+        } catch (e: IOException) {
+            bitmap = null
+        } finally {
+            if (`is` != null) try {
+                `is`.close()
+            } catch (ignored: IOException) {
+            }
+        }
+        return bitmap
     }
 }
