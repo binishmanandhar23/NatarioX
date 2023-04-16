@@ -105,10 +105,7 @@ abstract class BaseFilter : Filter {
         return createDefaultFragmentShader(fragmentTextureCoordinateName)
     }
 
-    private var mainVertexArray: ((FloatBuffer?) -> Unit)? = null
-    fun getMainVertexArray(mainVertexArray: ((FloatBuffer?) -> Unit)){
-        this.mainVertexArray = mainVertexArray
-    }
+
     override fun onCreate(programHandle: Int) {
         /*program = GlTextureProgram(
             programHandle,
