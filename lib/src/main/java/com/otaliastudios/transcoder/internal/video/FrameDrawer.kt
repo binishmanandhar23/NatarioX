@@ -6,13 +6,10 @@ import android.opengl.Matrix
 import android.view.Surface
 import androidx.annotation.GuardedBy
 import com.otaliastudios.opengl.draw.GlRect
-import com.otaliastudios.opengl.program.GlTextureProgram
 import com.otaliastudios.opengl.texture.GlTexture
 import com.otaliastudios.transcoder.internal.utils.Logger
-import com.otaliastudios.transcoder.test.BitmapOverlayFilter
 import com.otaliastudios.transcoder.test.natario.Filter
 import com.otaliastudios.transcoder.test.natario.GlTextureDrawer
-import com.otaliastudios.transcoder.test.natario.GrayscaleFilter
 
 /**
  * The purpose of this class is to create a [Surface] associated to a certain GL texture.

@@ -13,7 +13,7 @@ import com.otaliastudios.transcoder.internal.pipeline.Channel
 import com.otaliastudios.transcoder.internal.pipeline.State
 import com.otaliastudios.transcoder.internal.pipeline.Step
 import com.otaliastudios.transcoder.internal.utils.Logger
-import com.otaliastudios.transcoder.test.BitmapOverlayFilter
+import com.otaliastudios.transcoder.test.natario.BitmapOverlayFilter
 import com.otaliastudios.transcoder.test.natario.GrayscaleFilter
 
 
@@ -34,7 +34,7 @@ internal class VideoRenderer(
         var bitmapFilter: BitmapOverlayFilter? = null
         if(context != null) {
             val bitmap = BitmapFactory.decodeResource(context.resources, R.raw.christmas)
-            bitmapFilter = BitmapOverlayFilter(context, bitmap)
+            bitmapFilter = BitmapOverlayFilter(context = context, bitmap= bitmap)
         }
         val drawer = FrameDrawer(filter = bitmapFilter?: GrayscaleFilter())
         drawer.setFlipY(flipY)
